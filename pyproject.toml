@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "pyscirec"
+version = "0.1.0"
+description = ""
+authors = ["William Espinoza <wmespi@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+apple-music-python = "^1.0.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
