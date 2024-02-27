@@ -10,6 +10,8 @@ python = "^3.12"
 spotipy = "^2.23.0"
 autoenv = "^1.0.0"
 pandas = "^2.2.1"
+beautifulsoup4 = "^4.12.3"
+requests = "^2.31.0"
 
 
 [build-system]
