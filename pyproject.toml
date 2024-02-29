@@ -10,6 +10,7 @@ python = "^3.12"
 spotipy = "^2.23.0"
 pandas = "^2.2.1"
 requests = "^2.31.0"
+lyricsgenius = "^3.0.1"
 
 
 [build-system]
