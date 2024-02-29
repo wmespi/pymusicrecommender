@@ -1,7 +1,6 @@
+import os
 import pandas as pd
-import requests
-
-from bs4 import BeautifulSoup
+from lyricsgenius import Genius
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -36,42 +35,31 @@ track_pdf = pd.DataFrame(track_info)
 str_process = lambda s: ''.join([s for s in list(str(s.replace(' ','-')).lower()) if s.isalnum() or s == '-'])
 
 # Function to scrap lyrics for a song
+#### Adjust to make more memory efficient ####
 def scrape_lyrics(row, artist_str='artist', song_str='track_name'):
 
     # Update string format
     artist = str_process(row[artist_str])
     song = str_process(row[song_str])
 
-    # Set request URL
-    url = 'https://genius.com/'+ artist + '-' + song + '-' + 'lyrics'
-    page = requests.get(url)
+    # Setup genuis query object
+    g = Genius(os.environ['SMARTSHEET_ACCESS_TOKEN'])
 
-    # Ingest html
-    print(page.text)
-    html = BeautifulSoup(page.text, 'html.parser')
+    # Set artist
+    a = g.search_artist(artist)
 
-    # Get potential lyric sources
-    lyrics = html.find("div", class_="lyrics")
-    print(lyrics)
+    # Set song
+    s = a.song("song")
 
-    if lyrics:
-        return lyrics.get_text()
+    # Get lyrics
+    s.save_lyrics()
 
-    # Get potential lyrics from source 2
-    lyrics = html.find("div", class_="Lyrics__Container-sc-1ynbvzw-2 jgQsqn")
-    print(lyrics)
+    print(s)
 
-    if lyrics:
-        return lyrics.get_text()
-    
-    # Get potential lyrics from source 3
-    lyrics = html.find("div", class_="application")
-    print(lyrics)
-    a
+    # Find song
 
-    if lyrics:
-        return lyrics.get_text()    
-    return None
+
+    return s
 
 # Apply lyrics to dataframe
 track_pdf['lyrics'] = track_pdf.apply(scrape_lyrics, axis=1)
