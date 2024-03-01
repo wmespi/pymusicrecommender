@@ -56,12 +56,14 @@ def scrape_lyrics(row, artist_str='artist', song_str='track_name'):
     try:
         lyrics = s.lyrics
     except AttributeError:
-        lyrics = 'No lyrics matched from spotify to genuis'
+        lyrics = 'No lyrics'
 
     return lyrics
 
 # Apply lyrics to dataframe
 track_pdf['lyrics'] = track_pdf.apply(scrape_lyrics, axis=1)
-print(track_pdf)
+
+# Save to CSV
+track_pdf.to_csv('output/song_data.csv')
 
 #### Add more post processing to remove non-lyric sections from the text

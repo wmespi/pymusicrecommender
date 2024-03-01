@@ -12,6 +12,8 @@ pandas = "^2.2.1"
 requests = "^2.31.0"
 lyricsgenius = "^3.0.1"
 pyspark = "^3.5.1"
+bertopic = "^0.16.0"
+scikit-learn = "^1.4.1.post1"
 
 
 [build-system]
