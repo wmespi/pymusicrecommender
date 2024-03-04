@@ -10,7 +10,7 @@ sp_oauth = SpotifyOAuth(scope=scope)
 
 # Initialize API
 sp = Spotify(auth_manager=sp_oauth)
-top_tracks = sp.current_user_top_tracks(limit=20, time_range='long_term')
+top_tracks = sp.current_user_top_tracks(limit=50, time_range='long_term')
 
 # Iteratively pull relevant information
 track_info = []
@@ -67,3 +67,4 @@ track_pdf['lyrics'] = track_pdf.apply(scrape_lyrics, axis=1)
 track_pdf.to_csv('output/song_data.csv')
 
 #### Add more post processing to remove non-lyric sections from the text
+#### Add lyrics for 1k songs (not necessarily in the user's top 50)

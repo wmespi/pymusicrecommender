@@ -3,6 +3,12 @@ import pandas as pd
 from bertopic import BERTopic
 from bertopic.representation import KeyBERTInspired, PartOfSpeech, MaximalMarginalRelevance
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.datasets import fetch_20newsgroups
+
+# Get model for training BERTopic
+train_docs = fetch_20newsgroups(subset='all',  remove=('headers', 'footers', 'quotes'))['data']
+topic_model = BERTopic(n_gram_range=(2, 3))
+topics, probs = topic_model.fit_transform(train_docs)
 
 # Input data
 track_pdf = pd.read_csv('output/song_data.csv')
@@ -10,22 +16,7 @@ track_pdf = pd.read_csv('output/song_data.csv')
 # Get lyrics
 docs = list(track_pdf.lyrics.values)
 
-main_representation_model = KeyBERTInspired()
-aspect_representation_model1 = [KeyBERTInspired(top_n_words=30), 
-                                MaximalMarginalRelevance(diversity=.5)]
-
-representation_model = {
-   "Main": main_representation_model,
-   "Aspect1":  aspect_representation_model1
-}
-
-vectorizer_model = CountVectorizer(min_df=5, stop_words = 'english')
-topic_model = BERTopic(
-    nr_topics = 'auto', 
-    vectorizer_model = vectorizer_model,
-    representation_model = representation_model
-)
- 
-topics, ini_probs = topic_model.fit_transform(docs)
+topics, ini_probs = topic_model.transform(docs)
 print(topics)
 print(ini_probs)
+print(topic_model.get_topic())
