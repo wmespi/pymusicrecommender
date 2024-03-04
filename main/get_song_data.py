@@ -68,3 +68,5 @@ track_pdf.to_csv('output/song_data.csv')
 
 #### Add more post processing to remove non-lyric sections from the text
 #### Add lyrics for 1k songs (not necessarily in the user's top 50)
+#### Use AZLyrics Kaggle dataset 
+#### https://tim-denzler.medium.com/whats-in-a-song-using-lda-to-find-topics-in-over-120-000-songs-53785767b692
