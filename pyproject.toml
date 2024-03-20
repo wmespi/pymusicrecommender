@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pyscirec"
+name = "pysicrec"
 version = "0.1.0"
 description = ""
 authors = ["William Espinoza <wmespi@gmail.com>"]
@@ -15,7 +15,12 @@ pyspark = "^3.5.1"
 bertopic = "^0.16.0"
 scikit-learn = "^1.4.1.post1"
 langchain-community = "^0.0.27"
+stem = "^1.8.2"
+unidecode = "^1.3.8"
 
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.2"
 
 [build-system]
 requires = ["poetry-core"]
