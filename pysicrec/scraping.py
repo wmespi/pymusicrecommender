@@ -17,7 +17,6 @@ def _get_html(url):
     time.sleep(random.uniform(SCRAPE_RTD_MINIMUM, SCRAPE_RTD_MAXIMUM))  # RTD
     for i in range(0, SCRAPE_RETRIES_AMOUNT):
 
-        print(SCRAPE_RETRIES_AMOUNT)
         try:
 
             # Attempt to get url

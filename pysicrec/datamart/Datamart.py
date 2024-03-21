@@ -83,7 +83,7 @@ class Datamart:
             except Exception as e:
                 print(f'Error while getting artists from letter {
                       artist_letter
-                      }: {e}')
+                }: {e}')
 
                 break
 
@@ -125,7 +125,7 @@ class Datamart:
             except Exception as e:
                 print(f'Error while getting songs from artist {
                       artist_url
-                      }: {e}')
+                }: {e}')
 
             return song_url_list
 
