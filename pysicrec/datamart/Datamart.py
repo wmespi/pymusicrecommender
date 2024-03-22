@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import random
+import time
 from uuid import uuid4
 
 import pandas as pd
+import requests
 from bs4 import BeautifulSoup
 
+from pysicrec import *
 from pysicrec import string_cleaner
-from pysicrec.scraping import _get_html
-
 
 class Datamart:
 
@@ -18,6 +20,39 @@ class Datamart:
         # 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
         # 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
     ]
+
+    SCRAPE_PROXY = 'socks5://127.0.0.1:9050'
+    SCRAPE_RTD_MINIMUM = 5
+    SCRAPE_RTD_MAXIMUM = 10
+    SCRAPE_RETRIES_AMOUNT = 1
+    SCRAPE_RTD_ERROR_MINIMUM = 0.5
+    SCRAPE_RTD_ERROR_MAXIMUM = 1
+
+    # String cleaning
+    STR_CLEAN_TIMES = 3
+    STR_CLEAN_DICT = {
+        '\n\n': '\n',
+        '\n\r\n': '\n',
+        '\r': '',
+        '\n': ', ',
+        '  ': ' ',
+        ' ,': ',',
+        ' .': '.',
+        ' :': ':',
+        ' !': '!',
+        ' ?': '?',
+        ',,': ',',
+        '..': '.',
+        '::': ':',
+        '!!': '!',
+        '??': '?',
+        '.,': '.',
+        '.:': '.',
+        ',.': ',',
+        ',:': ',',
+        ':,': ':',
+        ':.': ':',
+    }
 
     def __init__(self) -> None:
 
@@ -43,7 +78,7 @@ class Datamart:
                 artist_letter_url = f'{
                     self.AZ_LYRICS_BASE_URL
                 }/{artist_letter}.html'
-                html_content = _get_html(artist_letter_url)
+                html_content = self._get_html(artist_letter_url)
 
                 # Extract html content
                 if html_content:
@@ -99,7 +134,7 @@ class Datamart:
             song_url_list = []
 
             try:
-                html_content = _get_html(artist_url)
+                html_content = self._get_html(artist_url)
                 if html_content:
                     soup = BeautifulSoup(html_content, 'html.parser')
 
@@ -134,7 +169,7 @@ class Datamart:
             song_lyrics = ''
 
             try:
-                html_content = _get_html(song_url)
+                html_content = self._get_html(song_url)
                 if html_content:
                     soup = BeautifulSoup(html_content, 'html.parser')
                     div_list = [
@@ -171,3 +206,35 @@ class Datamart:
         self.song_table = pd.DataFrame.from_dict(song_url_list)
 
         pass
+
+    def _get_html(self, url):
+        """
+        Retrieves the HTML content given a Internet accessible URL.
+        :param url: URL to retrieve.
+        :return: HTML content formatted as String, None if there was an error.
+        """
+        time.sleep(random.uniform(self.SCRAPE_RTD_MINIMUM, self.SCRAPE_RTD_MAXIMUM))  # RTD
+        for i in range(0, self.SCRAPE_RETRIES_AMOUNT):
+
+            try:
+
+                # Attempt to get url
+                response = requests.get(url)
+
+                # Check that the response worked
+                assert response.ok
+
+                # Extract content
+                html_content = response.content
+                return html_content
+
+            except Exception as e:
+                if i == self.SCRAPE_RETRIES_AMOUNT - 1:
+                    print(f'Unable to retrieve HTML from {url}: {e}')
+                else:
+                    time.sleep(
+                        random.uniform(
+                            self.SCRAPE_RTD_ERROR_MINIMUM, self.SCRAPE_RTD_ERROR_MAXIMUM,
+                        ),
+                    )
+        return None
