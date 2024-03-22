@@ -7,8 +7,13 @@ a = Datamart()
 
 # Populate artist table
 a.create_artist_table()
-print('Artist Table:\n', a.artist_table, '\n')
 
 # Populate song table
 a.create_song_table()
-print('Song Table:]n', a.song_table, '\n')
+
+# Join tables together
+master_pdf = a.song_table.merge(a.artist_table, on='artist_id')
+print('Joined Table:\n', master_pdf, '\n')
+
+# Write csv
+master_pdf.to_csv('song_data.csv')

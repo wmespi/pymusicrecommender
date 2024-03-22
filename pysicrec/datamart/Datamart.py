@@ -78,14 +78,10 @@ class Datamart:
                             # Add to artist list
                             artist_url_list.append(artist_dict)
 
-                            break
-
             except Exception as e:
                 print(f'Error while getting artists from letter {
                       artist_letter
                 }: {e}')
-
-                break
 
         # Create artist table
         self.artist_table = pd.DataFrame.from_dict(artist_url_list)
@@ -162,10 +158,7 @@ class Datamart:
         # Get all song information
         for artist in artists:
 
-            print(artist)
             song_url_list.extend(get_song_url_list(artist[0], artist[1]))
-
-            break
 
         # Get lyrics
         for i, entry in enumerate(song_url_list):
@@ -173,8 +166,6 @@ class Datamart:
             song_url_list[i]['song_lyrics_az'] = get_song_lyrics(
                 entry['song_url_az'],
             )
-
-            break
 
         # Create song table
         self.song_table = pd.DataFrame.from_dict(song_url_list)
