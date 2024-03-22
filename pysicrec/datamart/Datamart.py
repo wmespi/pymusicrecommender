@@ -74,9 +74,8 @@ class Datamart:
             try:
 
                 # Set artist letter url
-                artist_letter_url = f'{
-                    self.AZ_LYRICS_BASE_URL
-                }/{artist_letter}.html'
+                print(self.AZ_LYRICS_BASE_URL)
+                artist_letter_url = f'{self.AZ_LYRICS_BASE_URL}/{artist_letter}.html'
                 html_content = self._get_html(artist_letter_url)
 
                 # Extract html content

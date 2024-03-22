@@ -7,7 +7,7 @@ a = Datamart()
 
 # Populate artist table
 a.create_artist_table()
-# a.artist_table.to_csv('output/artist_table.csv')
+a.artist_table.to_csv('output/artist_table.csv')
 
 # # Populate song table
 # a.create_song_table()
