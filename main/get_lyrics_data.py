@@ -16,4 +16,4 @@ master_pdf = a.song_table.merge(a.artist_table, on='artist_id')
 print('Joined Table:\n', master_pdf, '\n')
 
 # Write csv
-master_pdf.to_csv('song_data.csv')
+master_pdf.to_csv('output/song_data.csv')
