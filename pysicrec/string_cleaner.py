@@ -26,7 +26,7 @@ def clean_name(name_str):
     """
     name_str = name_str.lower()
     name_str = name_str.strip()
-    name_str = unidecode.unidecode(name_str)
+    name_str = unidecode.unidecode(name_str).replace('"','')
     return name_str
 
 

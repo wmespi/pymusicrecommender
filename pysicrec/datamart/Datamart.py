@@ -16,9 +16,8 @@ class Datamart:
     # AZLyrics website
     AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
     AZ_LYRICS_ARTIST_LETTER_LIST = [
-        'a',
-        # 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-        # 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
     ]
 
     SCRAPE_PROXY = 'socks5://127.0.0.1:9050'
