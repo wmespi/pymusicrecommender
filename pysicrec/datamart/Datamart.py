@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import random
 import time
 from uuid import uuid4
@@ -7,6 +8,9 @@ from uuid import uuid4
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from lyricsgenius import Genius
+from spotipy import Spotify
+from spotipy.oauth2 import SpotifyOAuth
 
 from pysicrec import *
 from pysicrec import string_cleaner
@@ -26,44 +30,32 @@ class Datamart:
     SCRAPE_RETRIES_AMOUNT = 1
     SCRAPE_RTD_ERROR_MINIMUM = 0.5
     SCRAPE_RTD_ERROR_MAXIMUM = 1
-
-    # String cleaning
-    STR_CLEAN_TIMES = 3
-    STR_CLEAN_DICT = {
-        '\n\n': '\n',
-        '\n\r\n': '\n',
-        '\r': '',
-        '\n': ', ',
-        '  ': ' ',
-        ' ,': ',',
-        ' .': '.',
-        ' :': ':',
-        ' !': '!',
-        ' ?': '?',
-        ',,': ',',
-        '..': '.',
-        '::': ':',
-        '!!': '!',
-        '??': '?',
-        '.,': '.',
-        '.:': '.',
-        ',.': ',',
-        ',:': ',',
-        ':,': ':',
-        ':.': ':',
-    }
+    _TOKEN = os.getenv('GENUIS_ACCESS_TOKEN')
 
     def __init__(self) -> None:
 
         self.artist_table = None
         self.song_table = None
 
+        # Initialize genuis API
+        self.genuis = Genius(self._TOKEN)
+
+        # Setup  Spotofy OAuth
+        scope = ['user-top-read', 'user-read-recently-played', 'user-library-read']
+        sp_oauth = SpotifyOAuth(scope=scope)
+
+        # Initialize Spotify API
+        self.sp = Spotify(auth_manager=sp_oauth, requests_timeout=10, retries=10)
+
         pass
 
     def create_artist_table(self):
 
         # Iteratve over every letter
-        artist_url_list = []
+        artist_list = []
+
+        # Set list of spotify IDs
+        id_set = set()
 
         #### Change to run in parallel ####
         for artist_letter in self.AZ_LYRICS_ARTIST_LETTER_LIST:
@@ -94,33 +86,59 @@ class Datamart:
                             #### Replace with logging ####
                             print(f'\t[1] Processing [{artist_name}]...')
 
-                            # Clean artist url
-                            artist_url = string_cleaner.clean_url(
-                                '{}/{}'.format(
-                                    self.AZ_LYRICS_BASE_URL,
-                                    a['href'],
-                                ),
-                            )
-
                             # Setup dictionary
-                            artist_dict = {
-                                'artist_id': uuid4(),
-                                'artist_name': artist_name,
-                                'artist_url_az': artist_url,
-                            }
+                            try:
+                                artist_dict = self._get_spotify_artist_id(artist_name)
+
+                            except Exception as e:
+                                print(f'\tFailed artist {artist_name}: {e}')
+
+                            # Don't add repeats
+                            if artist_dict['artist_spotify_id'] in id_set:
+                                continue
 
                             # Add to artist list
-                            artist_url_list.append(artist_dict)
+                            artist_list.append(artist_dict)
+                            id_set.add(artist_dict['artist_spotify_id'])
 
             except Exception as e:
-                print(f'Error while getting artists from letter {
+                print(f'[2] Error while getting artists from letter {
                       artist_letter
                 }: {e}')
 
         # Create artist table
-        self.artist_table = pd.DataFrame.from_dict(artist_url_list)
+        self.artist_table = pd.DataFrame.from_dict(artist_list)
 
         pass
+
+    def set_artist_table(self, pdf):
+
+        self.artist_table = pdf
+
+        pass
+
+    def _get_spotify_artist_id(self, artist):
+
+        q = 'artist:' + artist
+
+        # Query artist name
+        results = self.sp.search(
+            q=q,
+            limit=1,
+            type='artist',
+        )
+
+        # Filter to relevant results
+        results = results['artists']['items'][0]
+
+        return {
+            'artist_id': uuid4(),
+            'artist_spotify_id': results['id'],
+            'artist_name': results['name'],
+            'artist_spotify_url': results['external_urls']['spotify'],
+            'artist_spotify_followers': results['followers']['total'],
+            'artist_spotify_popularity': results['popularity'],
+        }
 
     def create_song_table(self):
 
@@ -165,6 +183,8 @@ class Datamart:
             :param song_url: AZLyrics URL from a given song.
             :return: Cleaned and formatted song lyrics.
             """
+
+            #### Exploire musixmatch for song lyrics, ideally it has easy connection to spotify's internal IDs ####
             song_lyrics = ''
 
             try:
@@ -193,16 +213,17 @@ class Datamart:
         for artist in artists:
 
             song_url_list.extend(get_song_url_list(artist[0], artist[1]))
+            break
 
-        # Get lyrics
-        for i, entry in enumerate(song_url_list):
+        # # Get lyrics
+        # for i, entry in enumerate(song_url_list):
 
-            song_url_list[i]['song_lyrics_az'] = get_song_lyrics(
-                entry['song_url_az'],
-            )
+        #     song_url_list[i]['song_lyrics_az'] = get_song_lyrics(
+        #         entry['song_url_az'],
+        #     )
 
-        # Create song table
-        self.song_table = pd.DataFrame.from_dict(song_url_list)
+        # # Create song table
+        # self.song_table = pd.DataFrame.from_dict(song_url_list)
 
         pass
 
