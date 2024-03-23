@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 import os
+
 import pandas as pd
 from lyricsgenius import Genius
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 
 # Setup OAuth
-scope = ["user-top-read", "user-read-recently-played"]
+scope = ['user-top-read', 'user-read-recently-played']
 sp_oauth = SpotifyOAuth(scope=scope)
 
 # Initialize API
 sp = Spotify(auth_manager=sp_oauth)
 top_tracks = sp.current_user_top_tracks(limit=50, time_range='long_term')
+print(top_tracks)
 
 # Iteratively pull relevant information
 track_info = []
@@ -68,5 +72,5 @@ track_pdf.to_csv('output/song_data.csv')
 
 #### Add more post processing to remove non-lyric sections from the text
 #### Add lyrics for 1k songs (not necessarily in the user's top 50)
-#### Use AZLyrics Kaggle dataset 
+#### Use AZLyrics Kaggle dataset
 #### https://tim-denzler.medium.com/whats-in-a-song-using-lda-to-find-topics-in-over-120-000-songs-53785767b692
