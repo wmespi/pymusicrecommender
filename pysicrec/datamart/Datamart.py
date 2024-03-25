@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import os
-import sys
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
 from lyricsgenius import Genius
-from pyspark import SparkConf
 from pyspark import SparkContext
 from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
@@ -21,7 +19,6 @@ from pysicrec import webscraping as ws
 
 #Link for getting pyspark to work
 #### https://maelfabien.github.io/bigdata/SparkInstall/#
-sys.setrecursionlimit(5000)
 
 # String cleaning
 STR_CLEAN_TIMES = 3
@@ -167,9 +164,6 @@ class Datamart:
         # Collect output
         self.artist_table = output_sdf.toPandas()
 
-        # # Create artist table
-        # self.artist_table = pd.DataFrame.from_dict(artist_list)
-
         pass
 
     def set_artist_table(self, pdf):
@@ -200,7 +194,6 @@ class Datamart:
             'artist_spotify_followers': results['followers']['total'],
             'artist_spotify_popularity': results['popularity'],
         }
-
 
 
     def create_song_table(self):
@@ -267,6 +260,7 @@ class Datamart:
             return song_lyrics
 
         # Get list of all artist urls
+        print(self.artist_table)
         artists = self.artist_table[['artist_url_az', 'artist_id']].values
 
         # Store song urls
