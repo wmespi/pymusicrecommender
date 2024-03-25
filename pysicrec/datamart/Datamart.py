@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import random
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
@@ -118,6 +119,11 @@ class Datamart:
             return artist_list
 
         def _get_artist_info(artist_name):
+
+            # Log check
+            u = random.uniform(0, 1)
+            if u > 0.99:
+                print(f'\t[1] Processing [{artist_name}]...')
 
             # Setup dictionary
             try:
