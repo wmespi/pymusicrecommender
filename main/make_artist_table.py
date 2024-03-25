@@ -10,3 +10,4 @@ dm = Datamart()
 
 # Write table
 dm.create_artist_table()
+dm.artist_table.to_csv(temp_artist_loc)

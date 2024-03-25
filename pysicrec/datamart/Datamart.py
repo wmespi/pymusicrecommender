@@ -1,113 +1,174 @@
 from __future__ import annotations
 
 import os
-import random
-import time
+import sys
 from uuid import uuid4
 
-import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 from lyricsgenius import Genius
+from pyspark import SparkConf
+from pyspark import SparkContext
+from pyspark.sql import functions as F
+from pyspark.sql import SparkSession
+from pyspark.sql import types as T
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 
 from pysicrec import *
 from pysicrec import string_cleaner
+from pysicrec import webscraping as ws
+
+
+#Link for getting pyspark to work
+#### https://maelfabien.github.io/bigdata/SparkInstall/#
+sys.setrecursionlimit(5000)
+
+# String cleaning
+STR_CLEAN_TIMES = 3
+STR_CLEAN_DICT = {
+    '\n\n': '\n',
+    '\n\r\n': '\n',
+    '\r': '',
+    '\n': ', ',
+    '  ': ' ',
+    ' ,': ',',
+    ' .': '.',
+    ' :': ':',
+    ' !': '!',
+    ' ?': '?',
+    ',,': ',',
+    '..': '.',
+    '::': ':',
+    '!!': '!',
+    '??': '?',
+    '.,': '.',
+    '.:': '.',
+    ',.': ',',
+    ',:': ',',
+    ':,': ':',
+    ':.': ':',
+}
+
+# create entry points to spark
+try:
+    #stop sparkcontext if running
+    sc.stop()
+except:
+    pass
+finally:
+    #create object of SparkContext
+    sc = SparkContext.getOrCreate()
+    spark = SparkSession(sparkContext=sc)
+
+# AZLyrics website
+AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
+AZ_LYRICS_ARTIST_LETTER_LIST = [
+    'a', 'b',
+    'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    # 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
+]
+
+# Initialize genuis API
+_TOKEN = os.getenv('GENUIS_ACCESS_TOKEN')
+genuis = Genius(_TOKEN)
+
+# Setup  Spotofy OAuth
+scope = ['user-top-read', 'user-read-recently-played', 'user-library-read']
+sp_oauth = SpotifyOAuth(scope=scope)
+
+# Initialize Spotify API
+sp = Spotify(auth_manager=sp_oauth, requests_timeout=10, retries=10)
 
 class Datamart:
-
-    # AZLyrics website
-    AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
-    AZ_LYRICS_ARTIST_LETTER_LIST = [
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
-    ]
-
-    SCRAPE_PROXY = 'socks5://127.0.0.1:9050'
-    SCRAPE_RTD_MINIMUM = 5
-    SCRAPE_RTD_MAXIMUM = 10
-    SCRAPE_RETRIES_AMOUNT = 1
-    SCRAPE_RTD_ERROR_MINIMUM = 0.5
-    SCRAPE_RTD_ERROR_MAXIMUM = 1
-    _TOKEN = os.getenv('GENUIS_ACCESS_TOKEN')
 
     def __init__(self) -> None:
 
         self.artist_table = None
         self.song_table = None
 
-        # Initialize genuis API
-        self.genuis = Genius(self._TOKEN)
-
-        # Setup  Spotofy OAuth
-        scope = ['user-top-read', 'user-read-recently-played', 'user-library-read']
-        sp_oauth = SpotifyOAuth(scope=scope)
-
-        # Initialize Spotify API
-        self.sp = Spotify(auth_manager=sp_oauth, requests_timeout=10, retries=10)
-
         pass
 
     def create_artist_table(self):
 
-        # Iteratve over every letter
-        artist_list = []
-
-        # Set list of spotify IDs
-        id_set = set()
-
-        #### Change to run in parallel ####
-        for artist_letter in self.AZ_LYRICS_ARTIST_LETTER_LIST:
+        def _get_artists_from_letter(artist_letter):
 
             #### Replace with logging ####
             print(f'[1] Processing [{artist_letter}] letter...')
+
+            # Store output for the letter
+            artist_list = []
 
             try:
 
                 # Set artist letter url
                 artist_letter_url = f'{
-                    self.AZ_LYRICS_BASE_URL
+                    AZ_LYRICS_BASE_URL
                 }/{artist_letter}.html'
-                html_content = self._get_html(artist_letter_url)
+                html_content = ws.get_html(artist_letter_url)
 
                 # Extract html content
                 if html_content:
                     soup = BeautifulSoup(html_content, 'html.parser')
                     column_list = soup.find_all('div', {'class': 'artist-col'})
 
-                    for column in column_list:
-
-                        for a in column.find_all('a'):
-
-                            # Clean artist name
-                            artist_name = string_cleaner.clean_name(a.text)
-
-                            #### Replace with logging ####
-                            print(f'\t[1] Processing [{artist_name}]...')
-
-                            # Setup dictionary
-                            try:
-                                artist_dict = self._get_spotify_artist_id(artist_name)
-
-                            except Exception as e:
-                                print(f'\tFailed artist {artist_name}: {e}')
-
-                            # Don't add repeats
-                            if artist_dict['artist_spotify_id'] in id_set:
-                                continue
-
-                            # Add to artist list
-                            artist_list.append(artist_dict)
-                            id_set.add(artist_dict['artist_spotify_id'])
+                    return str([a.text for column in column_list for a in column.find_all('a')])
 
             except Exception as e:
                 print(f'[2] Error while getting artists from letter {
                       artist_letter
                 }: {e}')
 
-        # Create artist table
-        self.artist_table = pd.DataFrame.from_dict(artist_list)
+            return artist_list
+
+        def _get_artist_info(artist_name):
+
+            #### Replace with logging ####
+            # print(f'\t[1] Processing [{artist_name}]...')
+
+            # Setup dictionary
+            try:
+                q = 'artist:' + artist_name
+
+                # Query artist name
+                results = sp.search(
+                    q=q,
+                    limit=1,
+                    type='artist',
+                )
+
+                # Filter to relevant results
+                results = results['artists']['items'][0]
+
+                # Setup dictionary
+                artist_dict =  {
+                    'artist_id': uuid4(),
+                    'artist_spotify_id': results['id'],
+                    'artist_name': results['name'],
+                    'artist_spotify_url': results['external_urls']['spotify'],
+                    'artist_spotify_followers': results['followers']['total'],
+                    'artist_spotify_popularity': results['popularity'],
+                }
+
+                return str(artist_dict)
+
+            except Exception as e:
+                print(f'\tFailed artist {artist_name}: {e}')
+
+        # Create spark dataframe
+        letter_sdf = spark.createDataFrame([(letter, ) for letter in AZ_LYRICS_ARTIST_LETTER_LIST], ['letter'])
+
+        # Run artist extraction in parallel
+        scrape_udf = F.udf(_get_artists_from_letter)
+        output_sdf = letter_sdf.withColumn('scraped_data', scrape_udf('letter'))
+
+        # Explode artist dataframe
+        # output_sdf = output_sdf.select(F.explode("scraped_data"))
+
+        # Collect output
+        self.artist_table = output_sdf.toPandas()
+
+        # # Create artist table
+        # self.artist_table = pd.DataFrame.from_dict(artist_list)
 
         pass
 
@@ -139,6 +200,8 @@ class Datamart:
             'artist_spotify_followers': results['followers']['total'],
             'artist_spotify_popularity': results['popularity'],
         }
+
+
 
     def create_song_table(self):
 
@@ -226,35 +289,3 @@ class Datamart:
         # self.song_table = pd.DataFrame.from_dict(song_url_list)
 
         pass
-
-    def _get_html(self, url):
-        """
-        Retrieves the HTML content given a Internet accessible URL.
-        :param url: URL to retrieve.
-        :return: HTML content formatted as String, None if there was an error.
-        """
-        time.sleep(random.uniform(self.SCRAPE_RTD_MINIMUM, self.SCRAPE_RTD_MAXIMUM))  # RTD
-        for i in range(0, self.SCRAPE_RETRIES_AMOUNT):
-
-            try:
-
-                # Attempt to get url
-                response = requests.get(url)
-
-                # Check that the response worked
-                assert response.ok
-
-                # Extract content
-                html_content = response.content
-                return html_content
-
-            except Exception as e:
-                if i == self.SCRAPE_RETRIES_AMOUNT - 1:
-                    print(f'Unable to retrieve HTML from {url}: {e}')
-                else:
-                    time.sleep(
-                        random.uniform(
-                            self.SCRAPE_RTD_ERROR_MINIMUM, self.SCRAPE_RTD_ERROR_MAXIMUM,
-                        ),
-                    )
-        return None
