@@ -62,7 +62,7 @@ AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
 AZ_LYRICS_ARTIST_LETTER_LIST = [
     'a', 'b',
     'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    # 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
 ]
 
 # Initialize genuis API
@@ -108,7 +108,7 @@ class Datamart:
                     soup = BeautifulSoup(html_content, 'html.parser')
                     column_list = soup.find_all('div', {'class': 'artist-col'})
 
-                    return str([a.text for column in column_list for a in column.find_all('a')])
+                    return [a.text for column in column_list for a in column.find_all('a')]
 
             except Exception as e:
                 print(f'[2] Error while getting artists from letter {
@@ -120,10 +120,12 @@ class Datamart:
         def _get_artist_info(artist_name):
 
             #### Replace with logging ####
-            # print(f'\t[1] Processing [{artist_name}]...')
+            print(f'\t[1] Processing [{artist_name}]...')
 
             # Setup dictionary
             try:
+
+                # Artist query
                 q = 'artist:' + artist_name
 
                 # Query artist name
@@ -138,7 +140,7 @@ class Datamart:
 
                 # Setup dictionary
                 artist_dict =  {
-                    'artist_id': uuid4(),
+                    'artist_id': str(uuid4()),
                     'artist_spotify_id': results['id'],
                     'artist_name': results['name'],
                     'artist_spotify_url': results['external_urls']['spotify'],
@@ -151,18 +153,45 @@ class Datamart:
             except Exception as e:
                 print(f'\tFailed artist {artist_name}: {e}')
 
+        # Pull artist pages
+        artists = []
+        for letter in AZ_LYRICS_ARTIST_LETTER_LIST:
+            artists.extend(_get_artists_from_letter(letter))
+
         # Create spark dataframe
-        letter_sdf = spark.createDataFrame([(letter, ) for letter in AZ_LYRICS_ARTIST_LETTER_LIST], ['letter'])
+        artist_sdf = spark.createDataFrame([(artist, ) for artist in artists if artist is not None], ['start_name'])
 
         # Run artist extraction in parallel
-        scrape_udf = F.udf(_get_artists_from_letter)
-        output_sdf = letter_sdf.withColumn('scraped_data', scrape_udf('letter'))
+        scrape_udf = F.udf(_get_artist_info)
+        artist_sdf = artist_sdf.withColumn('scraped_data', scrape_udf('start_name'))
 
-        # Explode artist dataframe
-        # output_sdf = output_sdf.select(F.explode("scraped_data"))
+        # Specify json schema
+        json_schema = 'MAP<STRING,STRING>'
+        # Expand json into columns
+        artist_sdf = artist_sdf.withColumn(
+            'x',
+            F.from_json('scraped_data', json_schema)
+        )
+        print(artist_sdf.show)
+
+        # Get dictionary keys
+        keys = (artist_sdf
+            .select(F.explode('x'))
+            .select('key')
+            .distinct()
+            .rdd.flatMap(lambda x: x)
+            .collect()
+        )
+        # Select final columns
+        exprs = [F.col('x').getItem(k).alias(k) for k in keys]
+        artist_sdf = artist_sdf.select(*exprs)
+
+        # Make distinct
+        artist_sdf = artist_sdf.where('artist_spotify_id is not null')
+        artist_sdf = artist_sdf.dropDuplicates(subset=['artist_spotify_id'])
 
         # Collect output
-        self.artist_table = output_sdf.toPandas()
+        self.artist_table = artist_sdf.toPandas()
 
         pass
 
