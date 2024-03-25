@@ -167,12 +167,12 @@ class Datamart:
 
         # Specify json schema
         json_schema = 'MAP<STRING,STRING>'
+
         # Expand json into columns
         artist_sdf = artist_sdf.withColumn(
             'x',
             F.from_json('scraped_data', json_schema)
         )
-        print(artist_sdf.show)
 
         # Get dictionary keys
         keys = (artist_sdf
