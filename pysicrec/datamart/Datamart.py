@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from bs4 import BeautifulSoup
 from lyricsgenius import Genius
-from pyspark import SparkContext
 from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
 from pyspark.sql import types as T
@@ -47,23 +46,20 @@ STR_CLEAN_DICT = {
     ':.': ':',
 }
 
-# create entry points to spark
-try:
-    #stop sparkcontext if running
-    sc.stop()
-except:
-    pass
-finally:
-    #create object of SparkContext
-    sc = SparkContext.getOrCreate()
-    spark = SparkSession(sparkContext=sc)
+#create object of SparkContext
+spark = SparkSession.builder.master('local').\
+    appName('Word Count').\
+    config('spark.driver.bindAddress','localhost').\
+    config('spark.ui.port','4050').\
+    getOrCreate()
 
 # AZLyrics website
 AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
 AZ_LYRICS_ARTIST_LETTER_LIST = [
-    'a', 'b',
-    'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
+    'a',
+    # 'b',
+    # 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    # 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
 ]
 
 # Initialize genuis API
@@ -75,7 +71,7 @@ scope = ['user-top-read', 'user-read-recently-played', 'user-library-read']
 sp_oauth = SpotifyOAuth(scope=scope)
 
 # Initialize Spotify API
-sp = Spotify(auth_manager=sp_oauth, requests_timeout=10, retries=10)
+sp = Spotify(auth_manager=sp_oauth, requests_timeout=10, retries=1, status_retries=1)
 
 class Datamart:
 
@@ -120,10 +116,11 @@ class Datamart:
 
         def _get_artist_info(artist_name):
 
+            # Delay API calls
+            ws.sleep_timer()
+
             # Log check
-            u = random.uniform(0, 1)
-            if u > 0.99:
-                print(f'\t[1] Processing [{artist_name}]...')
+            print(f'\n\t[1] Processing [{artist_name}]...')
 
             # Setup dictionary
             try:
@@ -163,6 +160,7 @@ class Datamart:
 
         # Create spark dataframe
         artist_sdf = spark.createDataFrame([(artist, ) for artist in artists if artist is not None], ['start_name'])
+        artist_sdf = artist_sdf.repartition(6)
 
         # Run artist extraction in parallel
         scrape_udf = F.udf(_get_artist_info)
