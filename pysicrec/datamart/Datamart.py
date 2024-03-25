@@ -119,9 +119,6 @@ class Datamart:
 
         def _get_artist_info(artist_name):
 
-            #### Replace with logging ####
-            print(f'\t[1] Processing [{artist_name}]...')
-
             # Setup dictionary
             try:
 
