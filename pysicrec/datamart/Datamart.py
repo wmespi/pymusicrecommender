@@ -153,9 +153,6 @@ class Datamart:
             :return: List of pairs containing the song name and its AZLyrics URL.
             """
 
-            # Log check
-            print(f'\n\t[1] Processing songs for [{artist_id}]...')
-
             # Save songs
             songs = ''
 
