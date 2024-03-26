@@ -47,7 +47,6 @@ def get_html(url):
             # Extract content
             html_content = response.content
             return html_content
-            return url
 
         except Exception as e:
             if i == SCRAPE_RETRIES_AMOUNT - 1:
