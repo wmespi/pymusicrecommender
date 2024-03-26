@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pysicrec import webscraping as ws
 from pysicrec.datamart.Datamart import Datamart
 
 # Write table location

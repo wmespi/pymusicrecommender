@@ -6,11 +6,6 @@ from uuid import uuid4
 
 from bs4 import BeautifulSoup
 from lyricsgenius import Genius
-from pyspark.sql import functions as F
-from pyspark.sql import SparkSession
-from pyspark.sql import types as T
-from spotipy import Spotify
-from spotipy.oauth2 import SpotifyOAuth
 
 from pysicrec import *
 from pysicrec import string_cleaner
@@ -46,13 +41,6 @@ STR_CLEAN_DICT = {
     ':.': ':',
 }
 
-#create object of SparkContext
-spark = SparkSession.builder.master('local').\
-    appName('Word Count').\
-    config('spark.driver.bindAddress','localhost').\
-    config('spark.ui.port','4050').\
-    getOrCreate()
-
 # AZLyrics website
 AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
 AZ_LYRICS_ARTIST_LETTER_LIST = [
@@ -62,16 +50,12 @@ AZ_LYRICS_ARTIST_LETTER_LIST = [
     # 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
 ]
 
+# Setup API object
+sp = ws.get_spotify_api()
+
 # Initialize genuis API
 _TOKEN = os.getenv('GENUIS_ACCESS_TOKEN')
 genuis = Genius(_TOKEN)
-
-# Setup  Spotofy OAuth
-scope = ['user-top-read', 'user-read-recently-played', 'user-library-read']
-sp_oauth = SpotifyOAuth(scope=scope)
-
-# Initialize Spotify API
-sp = Spotify(auth_manager=sp_oauth, requests_timeout=10, retries=1, status_retries=1)
 
 class Datamart:
 
@@ -79,6 +63,18 @@ class Datamart:
 
         self.artist_table = None
         self.song_table = None
+
+        pass
+
+    def set_artist_table(self, pdf):
+
+        self.artist_table = pdf
+
+        pass
+
+    def set_song_table(self, pdf):
+
+        self.song_table = pdf
 
         pass
 
@@ -158,34 +154,11 @@ class Datamart:
         for letter in AZ_LYRICS_ARTIST_LETTER_LIST:
             artists.extend(_get_artists_from_letter(letter))
 
-        # Create spark dataframe
-        artist_sdf = spark.createDataFrame([(artist, ) for artist in artists if artist is not None], ['start_name'])
-        artist_sdf = artist_sdf.repartition(6)
+        # Extract data from API
+        artist_sdf = ws.run_parallel_calls(_get_artist_info, artists)
 
-        # Run artist extraction in parallel
-        scrape_udf = F.udf(_get_artist_info)
-        artist_sdf = artist_sdf.withColumn('scraped_data', scrape_udf('start_name'))
-
-        # Specify json schema
-        json_schema = 'MAP<STRING,STRING>'
-
-        # Expand json into columns
-        artist_sdf = artist_sdf.withColumn(
-            'x',
-            F.from_json('scraped_data', json_schema)
-        )
-
-        # Get dictionary keys
-        keys = (artist_sdf
-            .select(F.explode('x'))
-            .select('key')
-            .distinct()
-            .rdd.flatMap(lambda x: x)
-            .collect()
-        )
-        # Select final columns
-        exprs = [F.col('x').getItem(k).alias(k) for k in keys]
-        artist_sdf = artist_sdf.select(*exprs)
+        # Convert text
+        artist_sdf = ws.convert_str_to_json(artist_sdf, 'end')
 
         # Make distinct
         artist_sdf = artist_sdf.where('artist_spotify_id is not null')
@@ -193,12 +166,6 @@ class Datamart:
 
         # Collect output
         self.artist_table = artist_sdf.toPandas()
-
-        pass
-
-    def set_artist_table(self, pdf):
-
-        self.artist_table = pdf
 
         pass
 
@@ -228,7 +195,7 @@ class Datamart:
 
     def create_song_table(self):
 
-        def get_song_url_list(artist_url, artist_id):
+        def get_song_info(artist_id):
             """
             Retrieves the AZLyrics website URLs for all the songs from an artist AZLyrics URL.
             :param artist_url: AZLyrics URL from a given artist.
@@ -237,31 +204,50 @@ class Datamart:
             song_url_list = []
 
             try:
-                html_content = self._get_html(artist_url)
-                if html_content:
-                    soup = BeautifulSoup(html_content, 'html.parser')
 
-                    list_album_div = soup.find('div', {'id': 'listAlbum'})
-                    for a in list_album_div.find_all('a'):
-                        song_name = string_cleaner.clean_name(a.text)
-                        artist_url = string_cleaner.clean_url(
-                            '{}/{}'.format(
-                                self.AZ_LYRICS_BASE_URL,
-                                a['href'].replace('../', ''),
-                            ),
-                        )
-                        song_url_list.append({
-                            'song_id': uuid4(),
-                            'song_name': song_name,
-                            'song_url_az': artist_url,
-                            'artist_id': artist_id,
-                        })
+                # Extract top 10 songs per artist
+                tracks = sp.artist_top_tracks(artist_id, country='US')['tracks']
+
+                # Pull relevant info from dictionary
+                for track in tracks:
+
+                    song_url_list.append(str({
+                        'song_id': str(uuid4()),
+                        'artist_spotify_id': artist_id,
+                        'song_spotify_id': track['id'],
+                        'song_name': track['name'],
+                        'album_spotify_id': track['album']['id'],
+                        'album_name': track['album']['name'],
+                        'song_spotify_popularity': track['popularity'],
+                        'song_spotify_preview': track['preview_url']
+                    }))
+
             except Exception as e:
                 print(f'Error while getting songs from artist {
-                      artist_url
+                      artist_id
                 }: {e}')
 
             return song_url_list
+
+        # Get list of all artist urls
+        artists = self.artist_table['artist_spotify_id'].values
+        artists = artists[0:3]
+
+        # Pull top 10 songs for each artist
+        song_sdf = ws.run_parallel_calls(get_song_info, artists)
+        song_sdf = ws.convert_str_to_json(song_sdf, 'end', explode=True, json_schema='ARRAY<MAP<STRING,STRING>>')
+
+        # Convert columns to list
+        song_pdf = song_sdf.toPandas()
+
+
+        # # Get all song information
+        # for artist in artists:
+
+        #     song_url_list.extend(get_song_url_list(artist[0], artist[1]))
+        #     break
+
+    def create_lyrics_table(self):
 
         def get_song_lyrics(song_url):
             """
@@ -288,19 +274,6 @@ class Datamart:
                 print(f'Error while getting lyrics from song {song_url}: {e}')
 
             return song_lyrics
-
-        # Get list of all artist urls
-        print(self.artist_table)
-        artists = self.artist_table[['artist_url_az', 'artist_id']].values
-
-        # Store song urls
-        song_url_list = []
-
-        # Get all song information
-        for artist in artists:
-
-            song_url_list.extend(get_song_url_list(artist[0], artist[1]))
-            break
 
         # # Get lyrics
         # for i, entry in enumerate(song_url_list):

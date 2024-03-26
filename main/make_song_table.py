@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pandas as pd
+
 from pysicrec.datamart.Datamart import Datamart
 
 # Write table location
@@ -10,7 +12,8 @@ song_loc = 'main/song_table.csv'
 dm = Datamart()
 
 # Set artist table
-dm.set_artist_table(artist_loc)
+artist_pdf = pd.read_csv(artist_loc)
+dm.set_artist_table(artist_pdf)
 
 # Write table
 dm.create_song_table()
