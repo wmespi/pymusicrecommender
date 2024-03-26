@@ -189,7 +189,7 @@ class Datamart:
 
         # Split lists into sub-groups
         n_artists = len(artists)
-        n_p_group = 70
+        n_p_group = 100
         n_bins = int(n_artists / n_p_group)
         artist_groups = np.array_split(artists, n_bins)
         artist_groups = [[str(j) for j in i] for i in artist_groups]
@@ -216,7 +216,7 @@ class Datamart:
             # Delay until the next
             print(f'\n[2] Processed artist group {i} out of {n_bins} groups...')
             print(f'\n[3] Processed {len(artist_group)} artists in {round((time.time() - inner_start)/60, 2)} minutes...')
-            ws.sleep_timer(min=20, max=30)
+            ws.sleep_timer(min=5, max=15)
 
         # Convert columns to list
         self.song_table = song_sdf.toPandas()
