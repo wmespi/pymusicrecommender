@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from uuid import uuid4
 
 import numpy as np
@@ -188,7 +189,7 @@ class Datamart:
 
         # Split lists into sub-groups
         n_artists = len(artists)
-        n_p_group = 75
+        n_p_group = 70
         n_bins = int(n_artists / n_p_group)
         artist_groups = np.array_split(artists, n_bins)
         artist_groups = [[str(j) for j in i] for i in artist_groups]
@@ -197,6 +198,7 @@ class Datamart:
         for i, artist_group in enumerate(artist_groups):
 
             # Log statement
+            inner_start = time.time()
             print(f'\n[1] Processing artist group {i} out of {n_bins} groups...')
 
             # Run parallel extraction for 100 artists
@@ -213,7 +215,8 @@ class Datamart:
 
             # Delay until the next
             print(f'\n[2] Processed artist group {i} out of {n_bins} groups...')
-            ws.sleep_timer(min=29, max=31)
+            print(f'\n[3] Processed {len(artist_group)} artists in {round((time.time() - inner_start)/60, 2)} minutes...')
+            ws.sleep_timer(min=20, max=30)
 
         # Convert columns to list
         self.song_table = song_sdf.toPandas()
