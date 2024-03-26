@@ -189,7 +189,7 @@ class Datamart:
 
         # Split lists into sub-groups
         n_artists = len(artists)
-        n_p_group = 100
+        n_p_group = 150
         n_bins = int(n_artists / n_p_group)
         artist_groups = np.array_split(artists, n_bins)
         artist_groups = [[str(j) for j in i] for i in artist_groups]
