@@ -212,7 +212,7 @@ class Datamart:
                 song_sdf = sdf
 
             # Delay until the next
-            print(f'\n[1] Processed artist group {i} out of {n_bins} groups...')
+            print(f'\n[2] Processed artist group {i} out of {n_bins} groups...')
             ws.sleep_timer(min=29, max=31)
 
         # Convert columns to list
