@@ -4,6 +4,7 @@ import os
 import random
 from uuid import uuid4
 
+import numpy as np
 from bs4 import BeautifulSoup
 from lyricsgenius import Genius
 
@@ -169,29 +170,6 @@ class Datamart:
 
         pass
 
-    def _get_spotify_artist_id(self, artist):
-
-        q = 'artist:' + artist
-
-        # Query artist name
-        results = self.sp.search(
-            q=q,
-            limit=1,
-            type='artist',
-        )
-
-        # Filter to relevant results
-        results = results['artists']['items'][0]
-
-        return {
-            'artist_id': uuid4(),
-            'artist_spotify_id': results['id'],
-            'artist_name': results['name'],
-            'artist_spotify_url': results['external_urls']['spotify'],
-            'artist_spotify_followers': results['followers']['total'],
-            'artist_spotify_popularity': results['popularity'],
-        }
-
 
     def create_song_table(self):
 
@@ -201,7 +179,12 @@ class Datamart:
             :param artist_url: AZLyrics URL from a given artist.
             :return: List of pairs containing the song name and its AZLyrics URL.
             """
-            song_url_list = []
+
+            # Log check
+            print(f'\n\t[1] Processing songs for [{artist_id}]...')
+
+            # Save songs
+            songs = ''
 
             try:
 
@@ -211,41 +194,58 @@ class Datamart:
                 # Pull relevant info from dictionary
                 for track in tracks:
 
-                    song_url_list.append(str({
+                    songs += str({
                         'song_id': str(uuid4()),
-                        'artist_spotify_id': artist_id,
-                        'song_spotify_id': track['id'],
-                        'song_name': track['name'],
-                        'album_spotify_id': track['album']['id'],
-                        'album_name': track['album']['name'],
-                        'song_spotify_popularity': track['popularity'],
-                        'song_spotify_preview': track['preview_url']
-                    }))
+                        'artist_spotify_id': str(artist_id),
+                        'song_spotify_id': str(track['id']),
+                        'song_name': str(track['name']),
+                        'album_spotify_id': str(track['album']['id']),
+                        'album_name': str(track['album']['name']),
+                        'song_spotify_popularity': str(track['popularity']),
+                        'song_spotify_preview': str(track['preview_url'])
+                    }) + ';'
 
             except Exception as e:
                 print(f'Error while getting songs from artist {
                       artist_id
                 }: {e}')
 
-            return song_url_list
+            return songs
 
         # Get list of all artist urls
-        artists = self.artist_table['artist_spotify_id'].values
-        artists = artists[0:3]
+        artists = self.artist_table.drop_duplicates(subset=['artist_spotify_id'])
+        artists = list(artists['artist_spotify_id'].values)
+
+        # Split lists into sub-groups
+        n_artists = len(artists)
+        n_p_group = 50
+        n_bins = int(n_artists / n_p_group)
+        artist_groups = np.array_split(artists, n_bins)
+        artist_groups = [[str(j) for j in i] for i in artist_groups]
 
         # Pull top 10 songs for each artist
-        song_sdf = ws.run_parallel_calls(get_song_info, artists)
-        song_sdf = ws.convert_str_to_json(song_sdf, 'end', explode=True, json_schema='ARRAY<MAP<STRING,STRING>>')
+        for i, artist_group in enumerate(artist_groups):
+
+            # Log statement
+            print(f'\n[1] Processing artist group {i} out of {n_bins} groups...')
+
+            # Run parallel extraction for 100 artists
+            sdf = ws.run_parallel_calls(get_song_info, artist_group, partitions=6)
+            sdf = ws.convert_str_to_json(sdf, 'end', explode=True)
+            sdf = sdf.where('song_spotify_id is not null')
+
+            # Check if dataframe exists
+            try:
+                song_sdf = song_sdf.unionByName(sdf)
+            except UnboundLocalError:
+                print('\n\tPopulating song_sdf for first pass')
+                song_sdf = sdf
+
+            # Delay until the next
+            ws.sleep_timer(min=29, max=31)
 
         # Convert columns to list
-        song_pdf = song_sdf.toPandas()
-
-
-        # # Get all song information
-        # for artist in artists:
-
-        #     song_url_list.extend(get_song_url_list(artist[0], artist[1]))
-        #     break
+        self.song_table = song_sdf.toPandas()
 
     def create_lyrics_table(self):
 
@@ -274,15 +274,5 @@ class Datamart:
                 print(f'Error while getting lyrics from song {song_url}: {e}')
 
             return song_lyrics
-
-        # # Get lyrics
-        # for i, entry in enumerate(song_url_list):
-
-        #     song_url_list[i]['song_lyrics_az'] = get_song_lyrics(
-        #         entry['song_url_az'],
-        #     )
-
-        # # Create song table
-        # self.song_table = pd.DataFrame.from_dict(song_url_list)
 
         pass

@@ -6,9 +6,9 @@ import time
 import requests
 from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
+from pyspark.sql import types as T
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyClientCredentials
-from spotipy.oauth2 import SpotifyOAuth
 
 # Scraping parameters
 SCRAPE_PROXY = 'socks5://127.0.0.1:9050'
@@ -27,7 +27,6 @@ spark = SparkSession.builder.master('local').\
 
 def sleep_timer(min=SCRAPE_RTD_MINIMUM, max=SCRAPE_RTD_MAXIMUM):
     time.sleep(random.uniform(min, max))  # RTD
-
 
 def get_html(url):
     """
@@ -59,8 +58,11 @@ def get_html(url):
 
 def run_parallel_calls(func, values, partitions=2):
 
+    # Set schema
+    schema = T.StructType([T.StructField('start', T.StringType())])
+
     # Create spark dataframe
-    sdf = spark.createDataFrame([(i, ) for i in values if i is not None], ['start'])
+    sdf = spark.createDataFrame([(i, ) for i in values if i is not None], schema=schema)
     sdf = sdf.repartition(partitions)
 
     # Run artist extraction in parallel
@@ -71,16 +73,16 @@ def run_parallel_calls(func, values, partitions=2):
 
 def convert_str_to_json(sdf, col, json_schema='MAP<STRING,STRING>', explode=False):
 
+    if explode:
+        # Convert array of lists
+        sdf = sdf.withColumn(col, F.split(col, ';'))
+        sdf = sdf.select(F.explode(col).alias(col))
+
     # Expand json into columns
     sdf = sdf.withColumn(
         'x',
         F.from_json(col, json_schema)
     )
-    sdf.show()
-    print(sdf.dtypes)
-
-    if explode:
-        sdf = sdf.select(F.explode(col))
 
     # Get dictionary keys
     keys = (sdf
@@ -90,11 +92,10 @@ def convert_str_to_json(sdf, col, json_schema='MAP<STRING,STRING>', explode=Fals
         .rdd.flatMap(lambda x: x)
         .collect()
     )
+
     # Select final columns
     exprs = [F.col('x').getItem(k).alias(k) for k in keys]
     sdf = sdf.select(*exprs)
-    sdf.show()
-
 
     return sdf
 
@@ -102,10 +103,6 @@ def convert_str_to_json(sdf, col, json_schema='MAP<STRING,STRING>', explode=Fals
 def get_spotify_api():
 
     # Setup  Spotify OAuth
-    scope = ['user-top-read', 'user-read-recently-played', 'user-library-read']
-    # sp_oauth = SpotifyOAuth(scope=scope)
-    # sp_oauth.get_access_token(check_cache=True)
-    # print(sp_oauth)
     sp_oauth = SpotifyClientCredentials()
 
     # Initialize Spotify API
