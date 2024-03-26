@@ -16,32 +16,6 @@ from pysicrec import webscraping as ws
 #Link for getting pyspark to work
 #### https://maelfabien.github.io/bigdata/SparkInstall/#
 
-# String cleaning
-STR_CLEAN_TIMES = 3
-STR_CLEAN_DICT = {
-    '\n\n': '\n',
-    '\n\r\n': '\n',
-    '\r': '',
-    '\n': ', ',
-    '  ': ' ',
-    ' ,': ',',
-    ' .': '.',
-    ' :': ':',
-    ' !': '!',
-    ' ?': '?',
-    ',,': ',',
-    '..': '.',
-    '::': ':',
-    '!!': '!',
-    '??': '?',
-    '.,': '.',
-    '.:': '.',
-    ',.': ',',
-    ',:': ',',
-    ':,': ':',
-    ':.': ':',
-}
-
 # AZLyrics website
 AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
 AZ_LYRICS_ARTIST_LETTER_LIST = [
