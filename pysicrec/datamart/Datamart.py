@@ -39,6 +39,9 @@ class Datamart:
         self.artist_table = None
         self.song_table = None
 
+        self.artist_groups = None
+        self.n_bins = None
+
         pass
 
     def set_artist_table(self, pdf):
@@ -55,7 +58,7 @@ class Datamart:
 
     def create_artist_table(self):
 
-        def _get_artists_from_letter(artist_letter):
+        def get_artists_from_letter(artist_letter):
 
             #### Replace with logging ####
             print(f'[1] Processing [{artist_letter}] letter...')
@@ -85,13 +88,28 @@ class Datamart:
 
             return artist_list
 
-        def _get_artist_info(artist_name):
+        def set_artist_groups(artists):
 
-            # Delay API calls
-            ws.sleep_timer()
+            # Get number of artists
+            n_artists = len(artists)
 
-            # Log check
-            print(f'\n\t[1] Processing [{artist_name}]...')
+            # Set number of artist per group
+            n_p_group = 75
+
+            # Set number of bins to create
+            n_bins = int(n_artists / n_p_group)
+
+            # Split list
+            artist_groups = np.array_split(artists, n_bins)
+
+            # Save attributes
+            self.n_bins = n_bins
+            self.artist_groups = [[str(j) for j in i] for i in artist_groups]
+
+            pass
+
+
+        def get_artist_info(artist_name):
 
             # Setup dictionary
             try:
@@ -127,10 +145,38 @@ class Datamart:
         # Pull artist pages
         artists = []
         for letter in AZ_LYRICS_ARTIST_LETTER_LIST:
-            artists.extend(_get_artists_from_letter(letter))
+            artists.extend(get_artists_from_letter(letter))
+
+        # Set artist groups
+        set_artist_groups(artists)
+        print(f'\n[1] Processing {len(artists)}artists...')
+
+        # Pull top 10 songs for each artist
+        for i, artist_group in enumerate(self.artist_groups):
+
+            # Log statement
+            inner_start = time.time()
+            print(f'\n[1] Processing artist group {i} out of {self.n_bins} groups...')
+
+            # Run parallel extraction for 100 artists
+            sdf = ws.run_parallel_calls(get_artist_info, artist_group, partitions=6)
+            sdf = ws.convert_str_to_json(sdf, 'end', explode=True)
+            sdf = sdf.where('song_spotify_id is not null')
+
+            # Check if dataframe exists
+            try:
+                song_sdf = song_sdf.unionByName(sdf)
+            except UnboundLocalError:
+                print('\n\tPopulating song_sdf for first pass')
+                song_sdf = sdf
+
+            # Delay until the next
+            print(f'\n[2] Processed artist group {i} out of {self.n_bins} groups...')
+            print(f'\n[3] Processed {len(artist_group)} artists in {round((time.time() - inner_start)/60, 2)} minutes...')
+            ws.sleep_timer(min=15, max=30)
 
         # Extract data from API
-        artist_sdf = ws.run_parallel_calls(_get_artist_info, artists)
+        artist_sdf = ws.run_parallel_calls(get_artist_info, artists)
 
         # Convert text
         artist_sdf = ws.convert_str_to_json(artist_sdf, 'end')
@@ -187,19 +233,12 @@ class Datamart:
         artists = self.artist_table.drop_duplicates(subset=['artist_spotify_id'])
         artists = list(artists['artist_spotify_id'].values)
 
-        # Split lists into sub-groups
-        n_artists = len(artists)
-        n_p_group = 75
-        n_bins = int(n_artists / n_p_group)
-        artist_groups = np.array_split(artists, n_bins)
-        artist_groups = [[str(j) for j in i] for i in artist_groups]
-
         # Pull top 10 songs for each artist
-        for i, artist_group in enumerate(artist_groups):
+        for i, artist_group in enumerate(self.artist_groups):
 
             # Log statement
             inner_start = time.time()
-            print(f'\n[1] Processing artist group {i} out of {n_bins} groups...')
+            print(f'\n[1] Processing artist group {i} out of {self.n_bins} groups...')
 
             # Run parallel extraction for 100 artists
             sdf = ws.run_parallel_calls(get_song_info, artist_group, partitions=6)
@@ -214,9 +253,9 @@ class Datamart:
                 song_sdf = sdf
 
             # Delay until the next
-            print(f'\n[2] Processed artist group {i} out of {n_bins} groups...')
+            print(f'\n[2] Processed artist group {i} out of {self.n_bins} groups...')
             print(f'\n[3] Processed {len(artist_group)} artists in {round((time.time() - inner_start)/60, 2)} minutes...')
-            ws.sleep_timer(min=5, max=15)
+            ws.sleep_timer(min=10, max=15)
 
         # Convert columns to list
         self.song_table = song_sdf.toPandas()
