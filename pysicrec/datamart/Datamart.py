@@ -116,7 +116,7 @@ class Datamart:
             n_artists = len(artists)
 
             # Set number of artist per group
-            n_p_group = 85
+            n_p_group = 100
 
             # Set number of bins to create
             n_bins = int(n_artists / n_p_group)
@@ -189,11 +189,13 @@ class Datamart:
                 print('\n\tPopulating song_sdf for first pass')
                 artist_sdf = sdf
 
-            # Delay until the next
+            # Log status
             print(f'\n[2] Processed artist group {i} out of {self.n_bins} groups...')
             print(f'\n[3] Processed {len(artist_group)} artists in {round((time.time() - inner_start)/60, 2)} minutes...')
+
+            # Delay next query
+            ws.sleep_timer(min=1, max=5)
             print(f'\n[4] Processed {counter} artists in {round((time.time() - outer_start)/60, 2)} minutes...')
-            ws.sleep_timer(min=5, max=10)
 
         # Make distinct
         artist_sdf = artist_sdf.where('artist_spotify_id is not null')
