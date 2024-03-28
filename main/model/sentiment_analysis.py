@@ -1,9 +1,12 @@
-import pandas as pd
+from __future__ import annotations
 
+import pandas as pd
 from bertopic import BERTopic
-from bertopic.representation import KeyBERTInspired, PartOfSpeech, MaximalMarginalRelevance
-from sklearn.feature_extraction.text import CountVectorizer
+from bertopic.representation import KeyBERTInspired
+from bertopic.representation import MaximalMarginalRelevance
+from bertopic.representation import PartOfSpeech
 from sklearn.datasets import fetch_20newsgroups
+from sklearn.feature_extraction.text import CountVectorizer
 
 # Get model for training BERTopic
 train_docs = fetch_20newsgroups(subset='all',  remove=('headers', 'footers', 'quotes'))['data']

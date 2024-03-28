@@ -20,9 +20,8 @@ from pysicrec import webscraping as ws
 AZ_LYRICS_BASE_URL = 'https://www.azlyrics.com'
 AZ_LYRICS_ARTIST_LETTER_LIST = [
     'a',
-    # 'b',
-    # 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    # 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
+    'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '19'
 ]
 
 # Setup API object
@@ -39,8 +38,15 @@ class Datamart:
         self.artist_table = None
         self.song_table = None
 
+        self.artists = None
         self.artist_groups = None
         self.n_bins = None
+
+        pass
+
+    def set_artist_list(self, artists):
+
+        self.artists = artists
 
         pass
 
@@ -56,7 +62,7 @@ class Datamart:
 
         pass
 
-    def create_artist_table(self):
+    def create_artist_list(self):
 
         def get_artists_from_letter(artist_letter):
 
@@ -88,13 +94,29 @@ class Datamart:
 
             return artist_list
 
+        # Pull artist pages
+        artists = []
+        for letter in AZ_LYRICS_ARTIST_LETTER_LIST:
+
+            # Add to artist list
+            artists.extend(get_artists_from_letter(letter))
+
+            # Pause extract
+            ws.sleep_timer(min=1, max=5)
+
+        self.artists = artists
+
+        pass
+
+    def create_artist_table(self):
+
         def set_artist_groups(artists):
 
             # Get number of artists
             n_artists = len(artists)
 
             # Set number of artist per group
-            n_p_group = 75
+            n_p_group = 85
 
             # Set number of bins to create
             n_bins = int(n_artists / n_p_group)
@@ -107,7 +129,6 @@ class Datamart:
             self.artist_groups = [[str(j) for j in i] for i in artist_groups]
 
             pass
-
 
         def get_artist_info(artist_name):
 
@@ -140,16 +161,11 @@ class Datamart:
                 return str(artist_dict)
 
             except Exception as e:
-                print(f'\tFailed artist {artist_name}: {e}')
-
-        # Pull artist pages
-        artists = []
-        for letter in AZ_LYRICS_ARTIST_LETTER_LIST:
-            artists.extend(get_artists_from_letter(letter))
+                print(f'\n\tFailed artist {artist_name}: {e}')
 
         # Set artist groups
-        set_artist_groups(artists)
-        print(f'\n[1] Processing {len(artists)}artists...')
+        set_artist_groups(self.artists)
+        print(f'\n[1] Processing {len(self.artists)} artists...')
 
         # Pull top 10 songs for each artist
         for i, artist_group in enumerate(self.artist_groups):
@@ -161,25 +177,19 @@ class Datamart:
             # Run parallel extraction for 100 artists
             sdf = ws.run_parallel_calls(get_artist_info, artist_group, partitions=6)
             sdf = ws.convert_str_to_json(sdf, 'end', explode=True)
-            sdf = sdf.where('song_spotify_id is not null')
+            sdf = sdf.where('artist_spotify_id is not null')
 
             # Check if dataframe exists
             try:
-                song_sdf = song_sdf.unionByName(sdf)
+                artist_sdf = artist_sdf.unionByName(sdf)
             except UnboundLocalError:
                 print('\n\tPopulating song_sdf for first pass')
-                song_sdf = sdf
+                artist_sdf = sdf
 
             # Delay until the next
             print(f'\n[2] Processed artist group {i} out of {self.n_bins} groups...')
             print(f'\n[3] Processed {len(artist_group)} artists in {round((time.time() - inner_start)/60, 2)} minutes...')
-            ws.sleep_timer(min=15, max=30)
-
-        # Extract data from API
-        artist_sdf = ws.run_parallel_calls(get_artist_info, artists)
-
-        # Convert text
-        artist_sdf = ws.convert_str_to_json(artist_sdf, 'end')
+            ws.sleep_timer(min=20, max=25)
 
         # Make distinct
         artist_sdf = artist_sdf.where('artist_spotify_id is not null')
