@@ -168,10 +168,13 @@ class Datamart:
         print(f'\n[1] Processing {len(self.artists)} artists...')
 
         # Pull top 10 songs for each artist
+        outer_start = time.time()
+        counter = 0
         for i, artist_group in enumerate(self.artist_groups):
 
             # Log statement
             inner_start = time.time()
+            counter += len(artist_group)
             print(f'\n[1] Processing artist group {i} out of {self.n_bins} groups...')
 
             # Run parallel extraction for 100 artists
@@ -189,7 +192,8 @@ class Datamart:
             # Delay until the next
             print(f'\n[2] Processed artist group {i} out of {self.n_bins} groups...')
             print(f'\n[3] Processed {len(artist_group)} artists in {round((time.time() - inner_start)/60, 2)} minutes...')
-            ws.sleep_timer(min=20, max=25)
+            print(f'\n[4] Processed {counter} artists in {round((time.time() - outer_start)/60, 2)} minutes...')
+            ws.sleep_timer(min=5, max=10)
 
         # Make distinct
         artist_sdf = artist_sdf.where('artist_spotify_id is not null')
