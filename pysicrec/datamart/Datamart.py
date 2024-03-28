@@ -178,6 +178,7 @@ class Datamart:
             print(f'\n[1] Processing artist group {i} out of {self.n_bins} groups...')
 
             # Run parallel extraction for 100 artists
+            #### Add try clause ####
             sdf = ws.run_parallel_calls(get_artist_info, artist_group, partitions=6)
             sdf = ws.convert_str_to_json(sdf, 'end', explode=True)
             sdf = sdf.where('artist_spotify_id is not null')
